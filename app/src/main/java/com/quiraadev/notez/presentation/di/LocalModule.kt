@@ -2,8 +2,9 @@ package com.quiraadev.notez.presentation.di
 
 import android.content.Context
 import androidx.room.Room
-import com.quiraadev.notez.data.local.NoteDao
 import com.quiraadev.notez.data.local.NoteDatabase
+import com.quiraadev.notez.data.local.dao.NoteDao
+import com.quiraadev.notez.data.local.dao.TodoDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -26,6 +27,8 @@ object LocalModule {
     ).allowMainThreadQueries().fallbackToDestructiveMigration().build()
 
     @Provides
-    fun provideDao(database: NoteDatabase): NoteDao = database.dao()
+    fun provideNoteDao(database: NoteDatabase): NoteDao = database.noteDao()
 
+    @Provides
+    fun provideTodoDao(database: NoteDatabase): TodoDao = database.todoDao()
 }

@@ -1,4 +1,6 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3Api::class,
+    ExperimentalMaterial3Api::class
+)
 
 package com.quiraadev.notez.ui.screen
 
@@ -15,12 +17,16 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
@@ -28,20 +34,48 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
-import com.quiraadev.notez.presentation.events.NotesEvent
-import com.quiraadev.notez.presentation.states.NoteState
+import com.quiraadev.notez.presentation.common.NoteState
+import com.quiraadev.notez.presentation.common.NotesEvent
+import com.quiraadev.notez.presentation.viewmodel.NoteViewModel
 import com.quiraadev.notez.ui.navigator.Screen
 
 @Composable
 fun AddNoteScreen(
     state: NoteState,
     navController: NavHostController,
-    onEvent: (NotesEvent) -> Unit
+    onEvent: (NotesEvent) -> Unit,
+    noteViewModel: NoteViewModel
 ) {
+
+    val selectedNote by noteViewModel.selectedNote.collectAsState()
+
+    val currentTitle = selectedNote?.title ?: state.title.value
+    val currentContent = selectedNote?.content ?: state.content.value
+
+    LaunchedEffect(selectedNote) {
+        if (selectedNote != null) {
+            state.title.value = selectedNote!!.title
+            state.content.value = selectedNote!!.content
+        }
+    }
+
+    val onSaveClicked: () -> Unit = {
+        if (selectedNote != null) {
+            noteViewModel.updateNote(state.title.value, state.content.value)
+        } else {
+            onEvent(
+                NotesEvent.SaveNote(
+                    title = currentTitle,
+                    content = currentContent
+                )
+            )
+        }
+        Screen.pop(navController)
+    }
 
     return Scaffold(
         topBar = {
-            Surface(modifier = Modifier.fillMaxWidth(), shadowElevation = 4.dp) {
+            Surface(shadowElevation = 4.dp) {
                 LargeTopAppBar(
                     title = {
                         TextField(
@@ -64,19 +98,15 @@ fun AddNoteScreen(
                                 unfocusedContainerColor = Color.Transparent,
                                 focusedIndicatorColor = Color.Transparent,
                                 unfocusedIndicatorColor = Color.Transparent,
-                                focusedTextColor = Color.Black,
-                                unfocusedPlaceholderColor = Color.Gray
                             )
                         )
                     },
                     navigationIcon = {
-                        IconButton(onClick = {
-                            Screen.pop(navController)
-                        }) {
+                        IconButton(onClick = { Screen.pop(navController) }) {
                             Icon(
                                 imageVector = Icons.Rounded.ArrowBackIosNew,
                                 contentDescription = null,
-                                tint = Color.Blue
+                                tint = MaterialTheme.colorScheme.primary
                             )
                         }
                     }
@@ -85,21 +115,12 @@ fun AddNoteScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                containerColor = Color.Blue,
                 shape = CircleShape,
-                onClick = {
-                    onEvent(
-                        NotesEvent.SaveNote(
-                            title = state.title.value,
-                            content = state.content.value
-                        )
-                    )
-                    Screen.pop(navController)
-                }) {
+                onClick = onSaveClicked,
+            ) {
                 Icon(
                     imageVector = Icons.Rounded.Check,
                     contentDescription = "Save Note",
-                    tint = Color.White
                 )
             }
         }
@@ -109,6 +130,7 @@ fun AddNoteScreen(
                 .padding(innerPadding)
                 .fillMaxSize()
         ) {
+
             TextField(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -129,11 +151,8 @@ fun AddNoteScreen(
                     unfocusedContainerColor = Color.Transparent,
                     focusedIndicatorColor = Color.Transparent,
                     unfocusedIndicatorColor = Color.Transparent,
-                    focusedTextColor = Color.Black,
-                    unfocusedPlaceholderColor = Color.Gray
                 )
             )
-
         }
     }
 }

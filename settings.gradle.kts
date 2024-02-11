@@ -13,6 +13,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Notez"
+rootProject.name = "MemoPad"
 include(":app")
  

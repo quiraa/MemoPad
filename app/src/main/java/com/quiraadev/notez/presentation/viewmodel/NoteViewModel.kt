@@ -5,15 +5,16 @@ package com.quiraadev.notez.presentation.viewmodel
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.quiraadev.notez.data.local.NoteDao
+import com.quiraadev.notez.data.local.dao.NoteDao
 import com.quiraadev.notez.data.local.model.Note
-import com.quiraadev.notez.presentation.events.NotesEvent
-import com.quiraadev.notez.presentation.states.NoteState
+import com.quiraadev.notez.presentation.common.NoteState
+import com.quiraadev.notez.presentation.common.NotesEvent
 import com.quiraadev.notez.utils.Utils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
@@ -22,43 +23,46 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class HomeViewModel @Inject constructor(
-    private val dao: NoteDao
+class NoteViewModel @Inject constructor(
+    private val noteDao: NoteDao
 ) : ViewModel() {
+
+    private val _selectedNote = MutableStateFlow<Note?>(null)
+    val selectedNote = _selectedNote.asStateFlow()
 
     private val isSortedByDateCreated = MutableStateFlow(true)
 
     private var notes = isSortedByDateCreated.flatMapLatest { isSorted ->
-        if (isSorted) dao.getNotesOrderByDate()
-        else dao.getNotesOrderByTitle()
+        if (isSorted) noteDao.getNotesOrderByDate()
+        else noteDao.getNotesOrderByTitle()
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(), emptyList())
 
-    val _state = MutableStateFlow(NoteState())
-    val state = combine(_state, isSortedByDateCreated, notes) { state, isSorted, notes ->
+    private val _noteState = MutableStateFlow(NoteState())
+    val noteState = combine(_noteState, isSortedByDateCreated, notes) { state, isSorted, notes ->
         state.copy(
             notes = notes
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(500), NoteState())
 
-    fun onEvent(event: NotesEvent) {
+    fun onNoteEvent(event: NotesEvent)  {
         when (event) {
             is NotesEvent.DeleteNote -> {
                 viewModelScope.launch {
-                    dao.deleteNote(event.note)
+                    noteDao.deleteNote(event.note)
                 }
             }
 
             is NotesEvent.SaveNote -> {
                 val note = Note(
-                    title = state.value.title.value,
-                    content = state.value.content.value,
+                    title = noteState.value.title.value,
+                    content = noteState.value.content.value,
                     dateCreated = Utils.generateDate()
                 )
                 viewModelScope.launch {
-                    dao.upsertNote(note)
+                    noteDao.insertNote(note)
                 }
 
-                _state.update {
+                _noteState.update {
                     it.copy(
                         title = mutableStateOf(""),
                         content = mutableStateOf("")
@@ -72,13 +76,30 @@ class HomeViewModel @Inject constructor(
 
             is NotesEvent.DeleteAllNote -> {
                 viewModelScope.launch {
-                    dao.deleteAllNotes()
+                    noteDao.deleteAllNotes()
                 }
             }
-
-            is NotesEvent.UpdateNote -> {
-
-            }
         }
+    }
+
+    fun updateNote(title: String, content: String) {
+        val previousNoteId = selectedNote.value?.id ?: return
+        val previousNoteDate = selectedNote.value?.dateCreated ?: return
+        val updatedNote = Note(
+            id = previousNoteId,
+            title = title,
+            content = content,
+            dateCreated = previousNoteDate
+        )
+
+        viewModelScope.launch {
+            noteDao.updateNote(updatedNote)
+        }
+
+        setSelectedNote(updatedNote)
+    }
+
+    fun setSelectedNote(note: Note?) {
+        _selectedNote.value = note
     }
 }
